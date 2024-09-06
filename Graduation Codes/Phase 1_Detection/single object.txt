@@ -1,0 +1,63 @@
+import cv2
+import numpy as np
+import os
+
+def process_and_save_images(image_paths, output_folder):
+    # Create the output folder if it doesn't exist
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    for image_path in image_paths:
+        # Load image
+        image = cv2.imread(image_path)
+
+        # Convert image to grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Apply Gaussian blur to reduce noise and improve edge detection
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        # Perform adaptive thresholding
+        thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 11, 4)
+
+        # Apply morphological operations (dilation and erosion) to improve contour detection
+        kernel_dilation = np.ones((5, 5), np.uint8)
+        dilated = cv2.dilate(thresh, kernel_dilation, iterations=2)
+        kernel_erosion = np.ones((5, 5), np.uint8)
+        eroded = cv2.erode(dilated, kernel_erosion, iterations=2)
+
+        # Find contours in the thresholded image
+        contours, _ = cv2.findContours(eroded.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Sort contours based on their areas in descending order
+        contours = sorted(contours, key=cv2.contourArea, reverse=True)
+
+        # If there are contours
+        if contours:
+            # Get the largest contour
+            largest_contour = contours[0]
+
+            # Compute the bounding box for the largest contour
+            x, y, w, h = cv2.boundingRect(largest_contour)
+
+            # Crop the region corresponding to the bounding box
+            cropped = image[y:y+h, x:x+w]
+
+            # Save the cropped image
+            filename = os.path.splitext(os.path.basename(image_path))[0]
+            output_path = os.path.join(output_folder, f'{filename}_cropped.jpg')
+            cv2.imwrite(output_path, cropped)
+
+            print(f"Cropped image saved successfully: {output_path}")
+        else:
+            print(f"No contours found in {image_path}.")
+
+# List of image paths
+image_folder = r'C:\Users\Dell\Desktop\data\face\Menna'
+image_paths = [os.path.join(image_folder, filename) for filename in os.listdir(image_folder) if filename.endswith('.JPG')]
+
+# Define the folder to save cropped images
+output_folder = r'C:\Users\Dell\Desktop\cropped_images'
+
+# Process and save images
+process_and_save_images(image_paths, output_folder)

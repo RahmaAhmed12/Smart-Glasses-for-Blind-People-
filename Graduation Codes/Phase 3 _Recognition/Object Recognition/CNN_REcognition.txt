@@ -1,0 +1,86 @@
+import os
+import cv2
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+
+def load_data(data_path, classes):
+    images = []
+    labels = []
+
+    class_to_label = {class_name: i for i, class_name in enumerate(classes)}
+
+    for class_name in os.listdir(data_path):
+        if class_name in class_to_label:
+            class_index = class_to_label[class_name]
+            class_path = os.path.join(data_path, class_name)
+            for image_name in os.listdir(class_path):
+                image_path = os.path.join(class_path, image_name)
+
+                # Try to read the image
+                img = cv2.imread(image_path)
+
+                # Check if the image was successfully read
+                if img is not None:
+                    img = cv2.resize(img, (64, 64))  # Resize images to the desired input size
+                    img = img / 255.0  # Normalize pixel values to [0, 1]
+                    images.append(img)
+                    labels.append(class_index)  # Assign class index as label
+                else:
+                    print(f"Warning: Unable to read image {image_path}")
+
+    return np.array(images), np.array(labels)
+
+# Define your classes
+classes = ['bottel', 'chair', 'computer']
+
+# Load training data
+train_data_path = r'C:\Users\Dell\Desktop\RECOGNITION\TRAIN'
+train_images, train_labels = load_data(train_data_path, classes)
+
+# Load testing data
+test_data_path = r'C:\Users\Dell\Desktop\RECOGNITION\TEST'
+test_images, test_labels = load_data(test_data_path, classes)
+
+# Build CNN model
+model = models.Sequential([
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(64, 64, 3)),
+    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(128, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    layers.Flatten(),
+    layers.Dense(128, activation='relu'),
+    layers.Dense(len(classes), activation='softmax')
+])
+
+# Compile the model
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Train the model
+model.fit(train_images, train_labels, epochs=100)
+
+# Evaluate the model on the test set
+test_loss, test_accuracy = model.evaluate(test_images, test_labels)
+
+print(f'Test Accuracy: {test_accuracy}')
+
+# Make predictions on the test set
+predictions = np.argmax(model.predict(test_images), axis=1)
+
+# Create a confusion matrix
+conf_matrix = confusion_matrix(test_labels, predictions)
+
+# Calculate class-wise accuracy
+class_accuracies = conf_matrix.diagonal() / conf_matrix.sum(axis=1)
+
+# Print results
+for i, class_name in enumerate(classes):
+    print(f'Accuracy for {class_name}: {class_accuracies[i]}')
+
+print(f'Average Accuracy: {np.mean(class_accuracies)}')

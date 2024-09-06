@@ -1,0 +1,109 @@
+#1random forest
+
+import os
+import cv2
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+# Define paths to your train and test data folders
+train_folder = r"D:\task2 gp\Train"
+test_folder = r"D:\task2 gp\Test"
+
+# Function to load images and labels from a folder
+def load_data(folder, target_size=(100, 100)):
+    images = []
+    labels = []
+    for denomination in os.listdir(folder):
+        denomination_folder = os.path.join(folder, denomination)
+        for filename in os.listdir(denomination_folder):
+            img_path = os.path.join(denomination_folder, filename)
+            img = cv2.imread(img_path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Convert to grayscale if needed
+            img = cv2.resize(img, target_size)  # Resize the image to a common size
+            images.append(img)
+            labels.append(int(denomination))  # Assuming folder name is the label
+            
+            # Data augmentation: horizontal flip
+            flip_img = cv2.flip(img, 1)
+            images.append(flip_img)
+            labels.append(int(denomination))
+            
+            # Data augmentation: vertical flip
+            flip_img = cv2.flip(img, 0)
+            images.append(flip_img)
+            labels.append(int(denomination))
+            
+            # Data augmentation: rotation by 90 degrees
+            rotated_img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+            images.append(rotated_img)
+            labels.append(int(denomination))
+            
+            # Data augmentation: rotation by 180 degrees
+            rotated_img = cv2.rotate(img, cv2.ROTATE_180)
+            images.append(rotated_img)
+            labels.append(int(denomination))
+            
+            # Data augmentation: rotation by 270 degrees
+            rotated_img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            images.append(rotated_img)
+            labels.append(int(denomination))
+            
+    return np.array(images), np.array(labels)
+
+# Load train and test data
+train_images, train_labels = load_data(train_folder)
+test_images, test_labels = load_data(test_folder)
+
+# Reshape images to flatten them
+train_images_flat = train_images.reshape(train_images.shape[0], -1)
+test_images_flat = test_images.reshape(test_images.shape[0], -1)
+
+# Number of epochs
+num_epochs = 10
+
+# Initialize variables to keep track of best accuracy and corresponding model
+best_accuracy = 0.0
+best_model = None
+
+# Loop through epochs
+for epoch in range(num_epochs):
+    print(f"Epoch {epoch + 1}/{num_epochs}")
+    
+    # Create a Random Forest Classifier
+    model = RandomForestClassifier()
+
+    # Train the model
+    model.fit(train_images_flat, train_labels)
+
+    # Evaluate the model
+    predictions = model.predict(test_images_flat)
+    
+    # Calculate accuracy for each class individually
+    class_accuracy = {}
+    for denomination in np.unique(test_labels):
+        class_indices = np.where(test_labels == denomination)[0]
+        class_images = test_images_flat[class_indices]
+        class_labels = test_labels[class_indices]
+        class_predictions = model.predict(class_images)
+        accuracy = accuracy_score(class_labels, class_predictions)
+        class_accuracy[denomination] = accuracy
+        print(f"Accuracy for denomination {denomination}: {accuracy}")
+
+    # Calculate average accuracy
+    avg_accuracy = sum(class_accuracy.values()) / len(class_accuracy)
+    print("Average Accuracy:", avg_accuracy)
+    
+    # Check if the current model has achieved the highest average accuracy
+    if avg_accuracy > best_accuracy:
+        best_accuracy = avg_accuracy
+        best_model = model
+        print("New best model found. Saving weights...")
+
+# Save the weights of the best model
+if best_model is not None:
+    print("Saving best model weights...")
+    joblib.dump(best_model, 'best_model.pkl')
+    print("Best model weights saved.")
+else:
+    print("No improvement in accuracy. No weights saved.")
